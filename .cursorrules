@@ -1,0 +1,7 @@
+You are assisting on a Next.js (App Router) SaaS called FAQBot.
+- Prefer TypeScript.
+- Use server routes in src/app/api/*.
+- Put shared libs in src/lib/*.
+- Use zod for input validation.
+- Keep endpoints small and pure; no side effects beyond DB/API calls.
+- Always explain your changes in commit messages.
