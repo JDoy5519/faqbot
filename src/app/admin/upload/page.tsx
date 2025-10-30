@@ -4,7 +4,7 @@ import { supaServer } from "@/lib/supaServer";
 import UploadForm from "./UploadForm";
 
 export default async function AdminUploadPage() {
-  // Server-side: ensure you’re logged in, otherwise redirect to /login
+  // Server-side: ensure user is logged in
   const supa = await supaServer();
   const { data: { user } } = await supa.auth.getUser();
 
@@ -12,7 +12,7 @@ export default async function AdminUploadPage() {
     redirect("/login");
   }
 
-  // (Optional) Restrict to admins only:
+  // (Optional) Restrict to admins only
   // const { data: profile } = await supa
   //   .from("profiles")
   //   .select("role")
@@ -20,6 +20,31 @@ export default async function AdminUploadPage() {
   //   .single();
   // if (profile?.role !== "admin") redirect("/");
 
-  return <UploadForm />;
+  return (
+    <main style={{ maxWidth: 800, margin: "40px auto", fontFamily: "system-ui" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1>Upload Knowledge Base</h1>
+        <a
+          href="/admin/import"
+          style={{
+            marginLeft: 12,
+            textDecoration: "none",
+            padding: "6px 12px",
+            border: "1px solid #0d6efd",
+            borderRadius: 6,
+            color: "#0d6efd",
+            fontSize: 14,
+          }}
+        >
+          Import from URL/PDF
+        </a>
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        <UploadForm />
+      </div>
+    </main>
+  );
 }
+
 
