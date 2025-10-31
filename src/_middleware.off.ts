@@ -1,4 +1,4 @@
-// src/middleware.ts
+/* src/middleware.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
@@ -32,4 +32,4 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: ["/admin/:path*"], // only protect admin pages
-};
+};*/
