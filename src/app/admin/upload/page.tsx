@@ -8,6 +8,7 @@ type UploadItem = {
   status: "idle" | "uploading" | "processing" | "done" | "error";
   message?: string;
   resultUrl?: string | null;
+  documentId?: string;
 };
 
 export default function AdminUploadPage() {
@@ -35,6 +36,41 @@ export default function AdminUploadPage() {
     return null;
   };
 
+  const processDoc = async (docId: string, index: number) => {
+    setItems((prev) => {
+      const clone = [...prev];
+      clone[index] = { ...clone[index], status: "processing", message: "Processing…" };
+      return clone;
+    });
+
+    const res = await fetch("/api/admin/uploads/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: docId }),
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      setItems((prev) => {
+        const clone = [...prev];
+        clone[index] = { ...clone[index], status: "error", message: error || "Processing failed" };
+        return clone;
+      });
+      return;
+    }
+
+    const data = await res.json();
+    setItems((prev) => {
+      const clone = [...prev];
+      clone[index] = {
+        ...clone[index],
+        status: "done",
+        message: `Processed ${data.chunks_inserted} chunks`,
+      };
+      return clone;
+    });
+  };
+
   const uploadOne = (it: UploadItem, index: number) =>
     new Promise<void>((resolve) => {
       const err = validate(it.file);
@@ -51,7 +87,6 @@ export default function AdminUploadPage() {
       form.append("files", it.file);
       if (botId.trim()) form.append("bot_id", botId.trim());
 
-      // Use XHR to get upload progress
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/admin/uploads");
       xhr.upload.onprogress = (e) => {
@@ -63,33 +98,41 @@ export default function AdminUploadPage() {
           return clone;
         });
       };
-      xhr.onreadystatechange = () => {
+      xhr.onreadystatechange = async () => {
         if (xhr.readyState !== 4) return;
         try {
           if (xhr.status >= 200 && xhr.status < 300) {
-            // Show a brief "Processing..." state (placeholder for Day 7)
-            setItems((prev) => {
-              const clone = [...prev];
-              clone[index] = { ...clone[index], status: "processing", progress: 100 };
-              return clone;
-            });
             const json = JSON.parse(xhr.responseText);
             const url = json?.files?.[0]?.publicUrl ?? null;
+            const docId = json?.files?.[0]?.id as string | undefined;
 
-            // Simulate quick processing step complete
-            setTimeout(() => {
+            setItems((prev) => {
+              const clone = [...prev];
+              clone[index] = {
+                ...clone[index],
+                status: "processing",
+                progress: 100,
+                resultUrl: url,
+                documentId: docId,
+                message: "Processing…",
+              };
+              return clone;
+            });
+
+            if (docId) {
+              await processDoc(docId, index);
+            } else {
               setItems((prev) => {
                 const clone = [...prev];
                 clone[index] = {
                   ...clone[index],
-                  status: "done",
-                  message: "Uploaded",
-                  resultUrl: url,
+                  status: "error",
+                  message: "Missing document_id from upload response",
                 };
                 return clone;
               });
-              resolve();
-            }, 400);
+            }
+            resolve();
           } else {
             const msg = (() => {
               try {
@@ -123,7 +166,6 @@ export default function AdminUploadPage() {
     }
   }, [items]);
 
-  // Drag & drop handlers
   const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const files = e.dataTransfer.files;
@@ -133,7 +175,7 @@ export default function AdminUploadPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-semibold">Upload PDFs</h1>
+      <h1 className="text-2xl font-semibold">Upload & Process PDFs</h1>
 
       <div className="space-y-2">
         <label className="block text-sm text-gray-600">Optional Bot ID</label>
@@ -193,29 +235,18 @@ export default function AdminUploadPage() {
                 <div className="mt-2 text-sm">
                   {it.status === "idle" && <span>Ready</span>}
                   {it.status === "uploading" && <span>Uploading… {it.progress}%</span>}
-                  {it.status === "processing" && (
-                    <span className="animate-pulse">Processing…</span>
-                  )}
+                  {it.status === "processing" && <span className="animate-pulse">Processing…</span>}
                   {it.status === "done" && (
-                    <span className="text-green-700">
-                      ✅ Uploaded {it.resultUrl ? (
-                        <>
-                          –{" "}
-                          <a
-                            className="underline"
-                            href={it.resultUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            open
-                          </a>
-                        </>
-                      ) : null}
-                    </span>
+                    <span className="text-green-700">✅ {it.message} {it.resultUrl ? (
+                      <>
+                        –{" "}
+                        <a className="underline" href={it.resultUrl} target="_blank" rel="noreferrer">
+                          open
+                        </a>
+                      </>
+                    ) : null}</span>
                   )}
-                  {it.status === "error" && (
-                    <span className="text-red-700">⚠ {it.message || "Error"}</span>
-                  )}
+                  {it.status === "error" && <span className="text-red-700">⚠ {it.message || "Error"}</span>}
                 </div>
               </div>
             ))}
@@ -225,6 +256,7 @@ export default function AdminUploadPage() {
     </div>
   );
 }
+
 
 
 
