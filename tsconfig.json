@@ -1,36 +1,60 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
+    /* === Core behaviour === */
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ESNext"
+    ],
+    /* === JSX / React === */
     "jsx": "react-jsx",
+    "allowJs": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    /* === Type safety === */
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
     "incremental": true,
+    /* === IntelliSense + Next.js plugin === */
     "plugins": [
       {
         "name": "next"
       }
     ],
+    /* === Type roots (critical for next/server) === */
+    "types": [
+      "node",
+      "react",
+      "react-dom",
+      "next",
+      "next/types/global"
+    ],
+    /* === Aliases === */
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
+  /* === Files to include === */
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    "src/**/*",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "src/types/*.d.ts",
-    "**/*.mts"
+    ".next/dev/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  /* === Exclusions === */
+  "exclude": [
+    "node_modules"
+  ]
 }

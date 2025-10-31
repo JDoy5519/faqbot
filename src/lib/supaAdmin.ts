@@ -1,11 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) throw new Error("Missing SUPABASE_URL");
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Missing SUPABASE_SERVICE_ROLE");
+const url = process.env.SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export const supaAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false }, global: { headers: { "X-Client-Info": "faqbot-admin" } } }
-);
+if (!url) throw new Error("Missing env: SUPABASE_URL");
+if (!serviceKey) throw new Error("Missing env: SUPABASE_SERVICE_ROLE_KEY");
+
+// Server-side admin client (Service Role). Never import this in client components.
+export const supabaseAdmin = createClient(url, serviceKey, {
+  auth: { persistSession: false },
+  global: { headers: { "X-Client-Info": "faqbot-admin" } },
+});
 
