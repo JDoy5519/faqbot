@@ -1,118 +1,108 @@
-export const runtime = "nodejs"; // service role key must NOT run at the edge
+// src/app/api/chat/route.ts
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-import { NextRequest } from "next/server";
-import OpenAI from "openai";
-import { supaAdmin } from "@/lib/supaAdmin";
-import { retrieveTopK } from "@/lib/retrieve";
-import { buildPrompt } from "@/lib/prompt";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { supabaseAdmin } from "@/lib/supaAdmin";
+import { embedTexts, chat } from "@/lib/ai";
+import { buildSystemPrompt, buildUserPrompt, compactCitations, type Match } from "@/lib/rag";
 
-const USE_FAKE_ANSWERS = process.env.USE_FAKE_ANSWERS === "1";
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// Simple confidence mapping
-function confidenceFromSimilarity(sim: number) {
-  if (sim >= 0.85) return { score: sim, label: "high" as const };
-  if (sim >= 0.70) return { score: sim, label: "medium" as const };
-  return { score: sim, label: "low" as const };
-}
+const Body = z.object({
+  bot_id: z.string().uuid(),
+  messages: z.array(z.object({ role: z.enum(["user", "assistant", "system"]), content: z.string() })),
+  top_k: z.number().int().min(1).max(12).optional().default(6),
+  model: z.string().optional().default("gpt-4o-mini"),
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const { botId, question, conversationId } = await req.json();
+    const json = await req.json();
+    const { bot_id, messages, top_k, model } = Body.parse(json);
 
-    if (!botId || !question) {
-      return Response.json({ error: "Missing botId/question" }, { status: 400 });
+    // 1) Build a search query from the latest user message
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (!lastUser) {
+      return NextResponse.json({ ok: false, error: "No user message provided" }, { status: 400 });
+    }
+    const query = lastUser.content.trim();
+    if (!query) {
+      return NextResponse.json({ ok: false, error: "Empty user message" }, { status: 400 });
     }
 
-    // 👇 Guard: ensure the bot exists before any work
-    const { data: bot, error: botErr } = await supaAdmin
-      .from("bots")
-      .select("id")
-      .eq("id", botId)
-      .single();
-
-    if (botErr || !bot) {
-      return Response.json({ error: "Invalid botId" }, { status: 400 });
-    }
-
-    // 1) Retrieve chunks
-    const matches = await retrieveTopK(botId, question, 6);
-    const topSim = matches[0]?.similarity ?? 0;
-    const conf = confidenceFromSimilarity(topSim);
-
-    // 2) Build prompt
-    const prompt = buildPrompt(matches.map((m) => m.content), question);
-
-    // 3) Call the model (or fake)
-    let answer = "";
-    try {
-      if (USE_FAKE_ANSWERS) {
-        const preview = matches.map((m) => `• ${m.content}`).join("\n");
-        answer =
-          matches.length > 0
-            ? `Based on our documents:\n\n${preview}`
-            : `I'm not sure from our current FAQ. Would you like me to pass this to a human?`;
-      } else {
-        const res = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: "You answer ONLY from provided context." },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.2,
-        });
-        answer = res.choices[0]?.message?.content?.trim() || "";
-      }
-    } catch {
-      answer = "Sorry — our answer engine is unavailable right now. Please try again shortly.";
-    }
-
-    // 4) Ensure conversation
-    let convId = conversationId as string | undefined;
-    if (!convId) {
-      const { data: conv, error: eConv } = await supaAdmin
-        .from("conversations")
-        .insert({ bot_id: botId })
-        .select()
-        .single();
-      if (eConv || !conv) throw new Error(eConv?.message || "conversation create failed");
-      convId = conv.id;
-    }
-
-    // 5) Log user message
-    await supaAdmin.from("messages").insert({
-      conversation_id: convId,
-      role: "user",
-      content: question,
-      confidence: null,
+    // 2) Embed the query and run ANN search
+    const [qEmbedding] = await embedTexts([query]);
+    const { data, error } = await supabaseAdmin.rpc("search_chunks", {
+      query_embedding: qEmbedding,
+      q_bot_id: bot_id,
+      match_count: top_k,
     });
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
 
-    // 6) Log assistant reply
-    await supaAdmin.from("messages").insert({
-      conversation_id: convId,
-      role: "assistant",
-      content: answer,
-      confidence: conf.score,
+    const matches: Match[] =
+      (data ?? []).map((r: any) => ({
+        content: r.content,
+        document_id: r.document_id,
+        source_page_start: r.source_page_start,
+        source_page_end: r.source_page_end,
+        score: r.score,
+      })) ?? [];
+
+    // 3) Compose prompts
+    const system = buildSystemPrompt();
+    const user = buildUserPrompt(query, matches);
+
+    // 4) Call the chat model
+    const chatRes = await chat({
+      model,
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
     });
+    
 
-    // 7) Optional usage metric
-    await supaAdmin.from("usage_events").insert({
-      org_id: null,
-      bot_id: botId,
-      kind: "message",
-      qty: 1,
-    });
+    const answer = chatRes.choices[0]?.message?.content?.trim() || "";
 
-    return Response.json({
+    // 5) Heuristic: mark sources referenced (S1, S2...) if the assistant mentions them
+    // If not, include top 2 by score.
+    const used = new Set<number>();
+    const tagRegex = /\bS(\d{1,2})\b/g;
+    for (const m of answer.matchAll(tagRegex)) {
+      const idx = Number(m[1]) - 1;
+      if (idx >= 0 && idx < matches.length) used.add(idx);
+    }
+    if (used.size === 0) {
+      // take top 2
+      used.add(0);
+      if (matches.length > 1) used.add(1);
+    }
+
+    const usedIndexes = [...used].sort((a, b) => a - b);
+    const sources = usedIndexes.map((i) => ({
+      tag: `S${i + 1}`,
+      document_id: matches[i].document_id,
+      page_start: matches[i].source_page_start,
+      page_end: matches[i].source_page_end,
+    }));
+
+    // 6) Append compact citations if missing
+    const hasSourcesLine = /\bSources:\s*\[.*\]/i.test(answer);
+    const finalAnswer = hasSourcesLine
+      ? answer
+      : `${answer}\n\n${compactCitations(matches, usedIndexes)}`;
+
+    return NextResponse.json({
       ok: true,
-      conversationId: convId,
-      answer,
-      confidence: conf,
-      usedChunks: matches.map((m) => ({ id: m.id, similarity: m.similarity })),
+      answer: finalAnswer,
+      sources,
     });
   } catch (err: any) {
-    console.error("chat error", err?.message || err);
-    return Response.json({ error: err?.message || "chat failed" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: err?.message || "Bad request" }, { status: 400 });
   }
 }
+
 
