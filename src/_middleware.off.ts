@@ -1,35 +1,26 @@
-/* src/middleware.ts
-import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export async function middleware(req: NextRequest) {
-  // Run only for admin pages (see config below)
-  const res = NextResponse.next({ request: { headers: req.headers } });
+const ADMIN_COOKIE = "faqbot_admin";
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return req.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options?: CookieOptions) {
-          res.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options?: CookieOptions) {
-          res.cookies.set({ name, value: "", ...options });
-        },
-      },
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Only protect /admin/* (allow /admin/login)
+  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+    const cookie = req.cookies.get(ADMIN_COOKIE)?.value;
+    if (!cookie) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/admin/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
     }
-  );
+  }
 
-  // Touch auth so helpers refresh cookies when needed
-  await supabase.auth.getUser();
-
-  return res;
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*"], // only protect admin pages
-};*/
+  matcher: ["/admin/:path*"],
+};
+

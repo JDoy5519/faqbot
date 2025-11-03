@@ -10,7 +10,21 @@ type Row = {
   created_at: string;
   chunk_count: number;
   embedding_count: number;
+  last_job_status?: "queued" | "running" | "done" | "error" | null;
+  last_job_type?: string | null;
+  last_job_created_at?: string | null;
 };
+
+function JobBadge({ status }: { status?: Row["last_job_status"] }) {
+  if (!status) return null;
+  const color =
+    status === "queued" ? "bg-yellow-100 text-yellow-800" :
+    status === "running" ? "bg-blue-100 text-blue-800" :
+    status === "done"    ? "bg-green-100 text-green-800" :
+    status === "error"   ? "bg-red-100 text-red-800" :
+                           "bg-gray-100 text-gray-800";
+  return <span className={`px-2 py-0.5 text-xs rounded-full ${color}`}>{status}</span>;
+}
 
 export default function AdminDocumentsPage() {
   const [botId, setBotId] = useState("");
@@ -22,10 +36,10 @@ export default function AdminDocumentsPage() {
     setLoading(true);
     try {
       const qs = botId ? `?bot_id=${encodeURIComponent(botId)}` : "";
-      const res = await fetch(`/api/admin/documents${qs}`);
+      const res = await fetch(`/api/admin/documents${qs}`, { credentials: "include" });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "List failed");
-      setRows(json.documents || []);
+      setRows((json.documents || []) as Row[]);
     } catch (e: any) {
       alert(`Load failed: ${e.message}`);
     } finally {
@@ -35,10 +49,21 @@ export default function AdminDocumentsPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []); // initial load
 
+  // Auto-refresh while any job is active (queued/running)
+  useEffect(() => {
+    const hasActive = rows.some(r => r.last_job_status === "queued" || r.last_job_status === "running");
+    if (!hasActive) return;
+    const id = setInterval(() => { load(); }, 3000);
+    return () => clearInterval(id);
+  }, [rows]); // re-evaluate when rows change
+
   async function reembed(id: string) {
     setActionId(id);
     try {
-      const res = await fetch(`/api/admin/documents/${id}/reembed`, { method: "POST" });
+      const res = await fetch(`/api/admin/documents/${id}/reembed`, {
+        method: "POST",
+        credentials: "include",
+      });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Re-embed failed");
       await load();
@@ -53,7 +78,7 @@ export default function AdminDocumentsPage() {
     if (!confirm("Delete this document and its chunks/embeddings? This cannot be undone.")) return;
     setActionId(id);
     try {
-      const res = await fetch(`/api/admin/documents/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/documents/${id}`, { method: "DELETE", credentials: "include" });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Delete failed");
       setRows((r) => r.filter((x) => x.id !== id));
@@ -84,7 +109,11 @@ export default function AdminDocumentsPage() {
             placeholder="00000000-0000-0000-0000-000000000000"
           />
         </div>
-        <button onClick={load} className="rounded-xl px-4 py-2 bg-blue-600 text-white disabled:opacity-60" disabled={loading}>
+        <button
+          onClick={load}
+          className="rounded-xl px-4 py-2 bg-blue-600 text-white disabled:opacity-60"
+          disabled={loading}
+        >
           {loading ? "Loading…" : "Refresh"}
         </button>
       </div>
@@ -101,6 +130,7 @@ export default function AdminDocumentsPage() {
             <tr className="text-left border-b">
               <th className="py-2 pr-3">Title</th>
               <th className="py-2 pr-3">Source</th>
+              <th className="py-2 pr-3">Status</th>
               <th className="py-2 pr-3">Bot</th>
               <th className="py-2 pr-3">Chunks</th>
               <th className="py-2 pr-3">Embeds</th>
@@ -111,8 +141,12 @@ export default function AdminDocumentsPage() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b">
-                <td className="py-2 pr-3">{r.title || "(untitled)"}<div className="text-xs text-gray-500">{r.id}</div></td>
+                <td className="py-2 pr-3">
+                  {r.title || "(untitled)"}
+                  <div className="text-xs text-gray-500">{r.id}</div>
+                </td>
                 <td className="py-2 pr-3">{r.source_type || "-"}</td>
+                <td className="py-2 pr-3"><JobBadge status={r.last_job_status} /></td>
                 <td className="py-2 pr-3"><code className="text-xs">{r.bot_id}</code></td>
                 <td className="py-2 pr-3">{r.chunk_count}</td>
                 <td className="py-2 pr-3">{r.embedding_count}</td>
@@ -136,7 +170,11 @@ export default function AdminDocumentsPage() {
               </tr>
             ))}
             {!rows.length && !loading && (
-              <tr><td colSpan={7} className="py-6 text-center text-gray-500">No documents yet.</td></tr>
+              <tr>
+                <td colSpan={8} className="py-6 text-center text-gray-500">
+                  No documents yet.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -144,3 +182,4 @@ export default function AdminDocumentsPage() {
     </div>
   );
 }
+
