@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-// Temporarily disabled to bypass Tailwind/PostCSS build issue during smoke test
-// import "./globals.css";
+import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,6 +29,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        {/* Mount the Toaster once at the root */}
+        <Toaster richColors />
       </body>
     </html>
   );

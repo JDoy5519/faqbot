@@ -8,15 +8,24 @@ import { cookies, headers } from "next/headers";
  * Throws an Error (with .status = 401) if not authorized.
  */
 export async function ensureAdminOrThrow() {
-  // Option A: cookie set by /api/admin/auth/login
-  const cookieStore = await cookies();
-  const cookieVal = cookieStore.get("faqbot_admin")?.value;
+  // A) Cookie
+  const cookieVal = (await cookies()).get("faqbot_admin")?.value;
   if (cookieVal === "1") return;
 
-  // Option B: header for scripts/curl
-  const headerStore = await headers();
-  const hdr = headerStore.get("x-admin-token");
-  if (hdr && process.env.ADMIN_TOKEN && hdr === process.env.ADMIN_TOKEN) return;
+  // B) Headers
+  const h = await headers();
+
+  // x-admin-token header
+  const tokenHeader = h.get("x-admin-token");
+
+  // Authorization: Bearer <token>
+  const auth = h.get("authorization");
+  const bearer = auth?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
+
+  const presented = tokenHeader || bearer || "";
+  const expected = process.env.ADMIN_TOKEN || "";
+
+  if (presented && expected && presented === expected) return;
 
   const err = new Error("Unauthorized");
   (err as any).status = 401;

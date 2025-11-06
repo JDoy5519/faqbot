@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN as string | undefined;
+
 
 type Row = {
   id: string;
@@ -36,7 +38,12 @@ export default function AdminDocumentsPage() {
     setLoading(true);
     try {
       const qs = botId ? `?bot_id=${encodeURIComponent(botId)}` : "";
-      const res = await fetch(`/api/admin/documents${qs}`, { credentials: "include" });
+      // A) load()
+const res = await fetch(`/api/admin/documents${qs}`, {
+  credentials: "include",
+  headers: ADMIN_TOKEN ? { "x-admin-token": ADMIN_TOKEN } : undefined,
+});
+
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "List failed");
       setRows((json.documents || []) as Row[]);
@@ -60,10 +67,16 @@ export default function AdminDocumentsPage() {
   async function reembed(id: string) {
     setActionId(id);
     try {
-      const res = await fetch(`/api/admin/documents/${id}/reembed`, {
-        method: "POST",
-        credentials: "include",
-      });
+      // B) reembed(id)
+const res = await fetch(`/api/admin/documents/${id}/reembed`, {
+  method: "POST",
+  credentials: "include",
+headers: {
+   "content-type": "application/json",
+   ...(ADMIN_TOKEN ? { "x-admin-token": ADMIN_TOKEN } : {}),
+ },
+});
+
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Re-embed failed");
       await load();
@@ -78,7 +91,15 @@ export default function AdminDocumentsPage() {
     if (!confirm("Delete this document and its chunks/embeddings? This cannot be undone.")) return;
     setActionId(id);
     try {
-      const res = await fetch(`/api/admin/documents/${id}`, { method: "DELETE", credentials: "include" });
+      // C) del(id)
+const res = await fetch(`/api/admin/documents/${id}`, {
+  method: "DELETE",
+  credentials: "include",
+  headers: {
+  ...(ADMIN_TOKEN ? { "x-admin-token": ADMIN_TOKEN } : {}),
+ },
+});
+
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Delete failed");
       setRows((r) => r.filter((x) => x.id !== id));
@@ -182,4 +203,29 @@ export default function AdminDocumentsPage() {
     </div>
   );
 }
+
+// inside your Documents page component
+async function exportDocumentsCsv(orgId: string, botId?: string, q?: string) {
+  const qs = new URLSearchParams({ org_id: orgId });
+  if (botId) qs.set("bot_id", botId);
+  if (q) qs.set("q", q);
+  window.location.href = `/api/admin/documents/export?${qs.toString()}`;
+}
+
+async function batchDocuments(action: "reembed"|"delete", ids: string[], orgId: string, botId?: string) {
+  // D) batchDocuments(...)
+const res = await fetch("/api/admin/documents/batch", {
+  method: "POST",
+headers: {
+   "content-type":"application/json",
+   ...(ADMIN_TOKEN ? { "x-admin-token": ADMIN_TOKEN } : {}),
+ },
+  body: JSON.stringify({ action, ids, org_id: orgId, bot_id: botId }),
+});
+
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || "Batch failed");
+  return j;
+}
+
 
