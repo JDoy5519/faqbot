@@ -5,6 +5,7 @@ export type Match = {
   source_page_start: number | null;
   source_page_end: number | null;
   score: number;
+  document_title?: string | null;
 };
 
 export function buildSystemPrompt() {
@@ -50,3 +51,75 @@ export function compactCitations(matches: Match[], usedIndexes: number[]) {
   const tags = usedIndexes.map((i) => `S${i + 1}`);
 return `Sources: [${tags.join(", ")}]`;
 }
+
+// --- Add these helpers below your existing exports ---
+
+/**
+ * Build the final messages array for a chat completion call.
+ * Usage in /api/chat: const msgs = buildMessages(question, matches)
+ */
+export function buildMessages(
+  question: string,
+  matches: Match[],
+  system = buildSystemPrompt()
+) {
+  return [
+    { role: "system" as const, content: system },
+    { role: "user" as const, content: buildUserPrompt(question, matches) },
+  ];
+}
+
+/**
+ * Parse "Sources: [S1, S3, S4]" from the model answer and return zero-based indexes [0,2,3].
+ * If no sources are found, returns [].
+ */
+export function parseUsedSourceIndexes(answer: string): number[] {
+  const m = answer.match(/Sources:\s*\[([^\]]*)\]/i);
+  if (!m) return [];
+  const inside = m[1];
+  const tags = inside.split(",").map(s => s.trim());
+  const ids = tags
+    .map(t => t.match(/^S(\d+)$/i)?.[1])
+    .filter(Boolean)
+    .map(n => parseInt(n!, 10) - 1)
+    .filter(i => Number.isFinite(i) && i >= 0);
+  // Dedup and sort
+  return Array.from(new Set(ids)).sort((a, b) => a - b);
+}
+
+/**
+ * Render a readable citation block from indexes and matches.
+ * Example:
+ *  Sources:
+ *  1) Doc 123 — Title (pages 2–3)
+ */
+export function renderSourcesDetail(matches: Match[], usedIndexes: number[]) {
+  if (!usedIndexes.length) return "";
+  const lines = usedIndexes.map(idx => {
+    const m = matches[idx];
+    if (!m) return null;
+    const pages =
+      m.source_page_start == null && m.source_page_end == null
+        ? ""
+        : ` (pages ${m.source_page_start ?? "?"}–${m.source_page_end ?? "?"})`;
+    const title = m.document_title ? ` — ${m.document_title}` : "";
+    return `${idx + 1}) Doc ${m.document_id}${title}${pages}`;
+  }).filter(Boolean) as string[];
+
+  return ["", "Sources:", ...lines].join("\n");
+}
+
+/**
+ * Strip the compact "Sources: [...]" line from the raw model text.
+ */
+export function stripCompactSourcesLine(answer: string) {
+  return answer.replace(/\n?Sources:\s*\[[^\]]*\]\s*$/i, "").trim();
+}
+
+/**
+ * Convenience: choose top-k matches safely.
+ */
+export function topK(matches: Match[], k = 6): Match[] {
+  return (matches || []).slice(0, Math.max(0, k));
+}
+
