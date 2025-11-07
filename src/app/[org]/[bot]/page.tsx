@@ -10,7 +10,7 @@ type PageProps = { params: Promise<{ org: string; bot: string }> };
 export default async function HostedHelpPage({ params }: PageProps) {
   const { org, bot } = await params;
 
-  // Resolve org + bot + public token + display prefs
+  // Resolve org
   const { data: orgRow } = await supabaseAdmin
     .from("organizations")
     .select("id, name, slug")
@@ -18,24 +18,36 @@ export default async function HostedHelpPage({ params }: PageProps) {
     .single();
 
   if (!orgRow) {
-    return <main className="p-8">Unknown organization.</main>;
+    return <main className="p-8">Unknown organization: {org}</main>;
   }
 
+  // IMPORTANT: include public_token (and any fields you reference)
   const { data: botRow } = await supabaseAdmin
     .from("bots")
-    .select("id, name, slug, public_token, model, retrieval_k, max_tokens, cite_on")
+    .select("id, name, slug, public_token, retrieval_k, max_tokens, cite_on, org_id")
     .eq("org_id", orgRow.id)
     .eq("slug", bot)
     .single();
 
-  if (!botRow?.public_token) {
-    return <main className="p-8">Bot not found.</main>;
+  if (!botRow) {
+    return (
+      <main className="p-8">
+        Bot not found for org <b>{orgRow.slug}</b> and bot slug <b>{bot}</b>.
+      </main>
+    );
   }
 
-  // Brand + theme — you can wire this to Settings → Org later
+  if (!botRow.public_token) {
+    return (
+      <main className="p-8">
+        Bot exists but has no <code>public_token</code>. Add one and refresh.
+      </main>
+    );
+  }
+
   const brand = {
     orgName: orgRow.name ?? "Help Center",
-    accent: "#3B82F6",   // matches your VLM palette choice if you want
+    accent: "#3B82F6",
     theme: "light" as const,
   };
 
@@ -64,3 +76,4 @@ export default async function HostedHelpPage({ params }: PageProps) {
     </main>
   );
 }
+
