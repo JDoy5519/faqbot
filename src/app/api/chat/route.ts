@@ -13,6 +13,7 @@ import {
 } from "@/lib/rag";
 import { createPublicSupaClient } from "@/lib/supaClientPublic";
 import { supabaseAdmin } from "@/lib/supaAdmin";
+import { getOrgQuota, buildQuotaHeaders } from "@/lib/quota"; // <-- NEW
 
 // ---------------- rate limiter (simple, in-memory) ----------------
 const BUCKET = new Map<string, { tokens: number; updated: number }>();
@@ -108,6 +109,17 @@ export async function POST(req: NextRequest) {
       const resolvedBotId = botRow.id as string;
       const resolvedOrgId = botRow.org_id as string;
 
+      // ===== QUOTA GUARD (PUBLIC) =====
+      const quota = await getOrgQuota(resolvedOrgId);
+      if (quota.over) {
+        return NextResponse.json(
+          { ok: false, error: "Billing quota exceeded. Please upgrade your plan to continue." },
+          { status: 402 }
+        );
+      }
+      const warnHeaders = buildQuotaHeaders(quota);
+      // =================================
+
       // Embed query
       const [qEmbedding] = await embedTexts([query]);
 
@@ -194,13 +206,17 @@ export async function POST(req: NextRequest) {
         console.warn("usage_events insert failed (public)", e);
       }
 
-      return NextResponse.json({
-        ok: true,
-        mode,
-        bot_id: resolvedBotId,
-        answer,
-        sources,
-      });
+      // Return with quota warning header if applicable
+      return new NextResponse(
+        JSON.stringify({
+          ok: true,
+          mode,
+          bot_id: resolvedBotId,
+          answer,
+          sources,
+        }),
+        { status: 200, headers: warnHeaders }
+      );
     }
 
     // ---------------- PRIVATE MODE ----------------
@@ -248,6 +264,17 @@ export async function POST(req: NextRequest) {
 
     const resolvedBotIdPriv = bot_id;
     const resolvedOrgIdPriv = org_id;
+
+    // ===== QUOTA GUARD (PRIVATE) =====
+    const quotaPriv = await getOrgQuota(resolvedOrgIdPriv);
+    if (quotaPriv.over) {
+      return NextResponse.json(
+        { ok: false, error: "Billing quota exceeded. Please upgrade your plan to continue." },
+        { status: 402 }
+      );
+    }
+    const warnHeadersPriv = buildQuotaHeaders(quotaPriv);
+    // =================================
 
     // Embed query
     const [qEmbeddingPriv] = await embedTexts([query]);
@@ -335,13 +362,17 @@ export async function POST(req: NextRequest) {
       console.warn("usage_events insert failed (private)", e);
     }
 
-    return NextResponse.json({
-      ok: true,
-      mode,
-      bot_id: resolvedBotIdPriv,
-      answer,
-      sources,
-    });
+    // Return with quota warning header if applicable
+    return new NextResponse(
+      JSON.stringify({
+        ok: true,
+        mode,
+        bot_id: resolvedBotIdPriv,
+        answer,
+        sources,
+      }),
+      { status: 200, headers: warnHeadersPriv }
+    );
   } catch (err: any) {
     if (err?.issues) {
       return NextResponse.json({ ok: false, error: err.issues }, { status: 400 });
@@ -349,6 +380,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: err?.message || "Bad request" }, { status: 400 });
   }
 }
+
 
 
 

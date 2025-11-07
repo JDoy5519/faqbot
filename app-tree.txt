@@ -80,21 +80,37 @@ src/app
 │   │           └── route.ts
 │   ├── ai-ping
 │   │   └── route.ts
+│   ├── billing
+│   │   ├── checkout
+│   │   │   └── route.ts
+│   │   └── portal
+│   │       └── route.ts
 │   ├── chat
 │   │   └── route.ts
 │   ├── conversations
 │   │   └── route.ts
+│   ├── debug
+│   │   └── hosted
+│   │       └── [org]
+│   │           └── [bot]
+│   │               └── route.ts
 │   ├── health
 │   │   └── route.ts
 │   ├── ingest
 │   │   └── route.ts
 │   ├── kv-test
 │   │   └── route.ts
+│   ├── public
+│   │   └── widget
+│   │       └── route.ts
 │   ├── rls-test
 │   │   └── route.ts
-│   └── search-test
-│       ├── route.ts
-│       └── seed
+│   ├── search-test
+│   │   ├── route.ts
+│   │   └── seed
+│   │       └── route.ts
+│   └── stripe
+│       └── webhook
 │           └── route.ts
 ├── chat-test
 │   └── page.tsx
@@ -109,6 +125,9 @@ src/app
 │   └── [bot]
 │       ├── ChatClient.tsx
 │       └── page.tsx
-└── page.tsx
+├── page.tsx
+└── public
+    └── embed
+        └── page.tsx
 
-60 directories, 51 files
+73 directories, 57 files

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { fetchWithQuotaToast } from "@/lib/fetchWithQuotaToast";
+import { toast } from "sonner";
 
 type Msg = { role: "user" | "assistant"; content: string };
 type Props = { botPublicToken: string; accent?: string; citeOn?: boolean };
@@ -17,12 +19,14 @@ export default function ChatClient({ botPublicToken, accent = "#3B82F6", citeOn 
 
   async function ask() {
     const text = q.trim();
-    if (!text) return;
+    if (!text || loading) return;
+
     setQ("");
     setMessages((m) => [...m, { role: "user", content: text }]);
     setLoading(true);
+
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetchWithQuotaToast("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -30,9 +34,27 @@ export default function ChatClient({ botPublicToken, accent = "#3B82F6", citeOn 
           messages: [{ role: "user", content: text }],
           top_k: 6,
         }),
+        onWarn: (msg) => toast(msg), // e.g. "80% used (160000/200000)"
       });
+
+      // Hard stop at quota
+      if (res.status === 402) {
+        const j = await res.json().catch(() => ({} as any));
+        const msg = j?.error || "You’ve hit your monthly limit — upgrade to keep going.";
+        toast(msg);
+        setMessages((m) => [...m, { role: "assistant", content: `Heads up — ${mdSafe(msg)}` }]);
+        return;
+      }
+
+      // Other non-OK cases
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({} as any));
+        throw new Error(j?.error || `Request failed (${res.status})`);
+      }
+
       const j = await res.json();
       if (!j.ok) throw new Error(j.error || "Chat failed");
+
       setMessages((m) => [...m, { role: "assistant", content: formatAnswer(j.answer, citeOn) }]);
     } catch (e: any) {
       setMessages((m) => [...m, { role: "assistant", content: `Sorry — ${e.message}` }]);
@@ -98,3 +120,4 @@ function mdSafe(s: string) {
     .replace(/\*(.+?)\*/g, "<i>$1</i>")
     .replace(/\n/g, "<br/>");
 }
+
