@@ -1,31 +1,38 @@
+"use client"; // must be first
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-"use client";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-export default function EmbedPage({ searchParams }: any) {
-  const token = (searchParams?.token as string) || "";
-  const theme = (searchParams?.theme as string) || "light";
-  const color = (searchParams?.color as string) || "#3B82F6";
-  const corner = (searchParams?.corner as string) || "right";
+export default function EmbedPage() {
+  const sp = useSearchParams();
 
-  const [messages, setMessages] = useState<{ role: "user"|"assistant"; content: string }[]>([]);
+  const token = sp.get("token") || "";
+  const theme = sp.get("theme") || "light";
+  const color = sp.get("color") || "#3B82F6";
+  const corner = sp.get("corner") || "right";
+
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const styles = useMemo(() => ({
-    bg: theme === "dark" ? "#0B1220" : "#FFFFFF",
-    fg: theme === "dark" ? "#E5E7EB" : "#111827",
-    sub: theme === "dark" ? "#9CA3AF" : "#6B7280",
-    bubbleBg: theme === "dark" ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.04)",
-  }), [theme]);
+  const styles = useMemo(
+    () => ({
+      bg: theme === "dark" ? "#0B1220" : "#FFFFFF",
+      fg: theme === "dark" ? "#E5E7EB" : "#111827",
+      sub: theme === "dark" ? "#9CA3AF" : "#6B7280",
+      bubbleBg: theme === "dark" ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.04)",
+    }),
+    [theme]
+  );
 
   async function ask() {
     const text = q.trim();
     if (!text || !token) return;
     setQ("");
-    setMessages(m => [...m, { role: "user", content: text }]);
+    setMessages((m) => [...m, { role: "user", content: text }]);
     setLoading(true);
     try {
       const res = await fetch("/api/chat", {
@@ -38,18 +45,30 @@ export default function EmbedPage({ searchParams }: any) {
       });
       const j = await res.json();
       if (!j.ok) throw new Error(j.error || "Chat failed");
-      setMessages(m => [...m, { role: "assistant", content: j.answer }]);
+      setMessages((m) => [...m, { role: "assistant", content: j.answer }]);
     } catch (e: any) {
-      setMessages(m => [...m, { role: "assistant", content: `Sorry — ${e.message}` }]);
+      setMessages((m) => [...m, { role: "assistant", content: `Sorry — ${e.message}` }]);
     } finally {
       setLoading(false);
     }
   }
 
-  if (!token) return <div style={{ padding: 16 }}>Missing token</div>;
+  if (!token) {
+    return <div style={{ padding: 16, fontSize: 12 }}>Missing token</div>;
+  }
 
   return (
-    <div style={{ background: styles.bg, color: styles.fg, width: "100%", height: "100%", padding: 12, boxSizing: "border-box", borderRadius: 16 }}>
+    <div
+      style={{
+        background: styles.bg,
+        color: styles.fg,
+        width: "100%",
+        height: "100%",
+        padding: 12,
+        boxSizing: "border-box",
+        borderRadius: 16,
+      }}
+    >
       <div style={{ fontWeight: 600, marginBottom: 8 }}>Help Assistant</div>
       <div style={{ fontSize: 12, color: styles.sub, marginBottom: 12 }}>Ask a question below</div>
 
@@ -57,7 +76,15 @@ export default function EmbedPage({ searchParams }: any) {
         {messages.map((m, i) => (
           <div key={i} style={{ textAlign: m.role === "user" ? "right" : "left", marginBottom: 8 }}>
             <span
-              style={{ display: "inline-block", padding: "8px 12px", borderRadius: 14, background: m.role === "user" ? color : styles.bubbleBg, color: m.role === "user" ? "white" : styles.fg, fontSize: 13, whiteSpace: "pre-wrap" }}
+              style={{
+                display: "inline-block",
+                padding: "8px 12px",
+                borderRadius: 14,
+                background: m.role === "user" ? color : styles.bubbleBg,
+                color: m.role === "user" ? "white" : styles.fg,
+                fontSize: 13,
+                whiteSpace: "pre-wrap",
+              }}
             >
               {m.content}
             </span>
@@ -69,15 +96,30 @@ export default function EmbedPage({ searchParams }: any) {
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         <input
           value={q}
-          onChange={e => setQ(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") ask(); }}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && ask()}
           placeholder="Type your question…"
-          style={{ flex: 1, borderRadius: 12, border: "1px solid rgba(0,0,0,.1)", padding: "10px 12px", fontSize: 13, background: styles.bg, color: styles.fg }}
+          style={{
+            flex: 1,
+            borderRadius: 12,
+            border: "1px solid rgba(0,0,0,.1)",
+            padding: "10px 12px",
+            fontSize: 13,
+            background: styles.bg,
+            color: styles.fg,
+          }}
         />
         <button
           onClick={ask}
           disabled={loading}
-          style={{ borderRadius: 12, padding: "10px 14px", background: color, color: "white", fontSize: 13, fontWeight: 600 }}
+          style={{
+            borderRadius: 12,
+            padding: "10px 14px",
+            background: color,
+            color: "white",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
         >
           Send
         </button>
@@ -85,3 +127,4 @@ export default function EmbedPage({ searchParams }: any) {
     </div>
   );
 }
+
