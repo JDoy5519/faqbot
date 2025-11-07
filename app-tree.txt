@@ -1,0 +1,114 @@
+src/app
+├── admin
+│   ├── chat
+│   │   └── page.tsx
+│   ├── conversations
+│   │   ├── [id]
+│   │   │   ├── export
+│   │   │   └── page.tsx
+│   │   ├── messages
+│   │   │   └── [id]
+│   │   │       └── feedback
+│   │   └── page.tsx
+│   ├── documents
+│   │   └── page.tsx
+│   ├── import
+│   │   └── page.tsx
+│   ├── jobs
+│   │   └── page.tsx
+│   ├── login
+│   │   └── page.tsx
+│   ├── search
+│   │   └── page.tsx
+│   ├── settings
+│   │   ├── bot
+│   │   │   └── page.tsx
+│   │   └── org
+│   │       └── page.tsx
+│   ├── upload
+│   │   ├── page.tsx
+│   │   └── UploadForm.tsx
+│   └── usage
+│       └── page.tsx
+├── api
+│   ├── admin
+│   │   ├── auth
+│   │   │   ├── login
+│   │   │   │   └── route.ts
+│   │   │   └── logout
+│   │   │       └── route.ts
+│   │   ├── conversations
+│   │   │   ├── [id]
+│   │   │   │   ├── export
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   └── route.ts
+│   │   ├── documents
+│   │   │   ├── batch
+│   │   │   │   └── route.ts
+│   │   │   ├── export
+│   │   │   │   └── route.ts
+│   │   │   ├── [id]
+│   │   │   │   ├── reembed
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   └── route.ts
+│   │   ├── embeddings
+│   │   │   └── process
+│   │   │       └── route.ts
+│   │   ├── jobs
+│   │   │   └── route.ts
+│   │   ├── messages
+│   │   │   └── [id]
+│   │   │       └── feedback
+│   │   │           └── route.ts
+│   │   ├── search
+│   │   │   └── route.ts
+│   │   ├── settings
+│   │   │   ├── bot
+│   │   │   │   └── route.ts
+│   │   │   └── org
+│   │   │       └── route.ts
+│   │   ├── uploads
+│   │   │   ├── process
+│   │   │   │   └── route.ts
+│   │   │   └── route.ts
+│   │   └── usage
+│   │       ├── daily
+│   │       │   └── route.ts
+│   │       └── export
+│   │           └── route.ts
+│   ├── ai-ping
+│   │   └── route.ts
+│   ├── chat
+│   │   └── route.ts
+│   ├── conversations
+│   │   └── route.ts
+│   ├── health
+│   │   └── route.ts
+│   ├── ingest
+│   │   └── route.ts
+│   ├── kv-test
+│   │   └── route.ts
+│   ├── rls-test
+│   │   └── route.ts
+│   └── search-test
+│       ├── route.ts
+│       └── seed
+│           └── route.ts
+├── chat-test
+│   └── page.tsx
+├── favicon.ico
+├── globals.css
+├── layout.tsx
+├── login
+│   └── page.tsx
+├── ok
+│   └── route.ts
+├── [org]
+│   └── [bot]
+│       ├── ChatClient.tsx
+│       └── page.tsx
+└── page.tsx
+
+60 directories, 51 files
