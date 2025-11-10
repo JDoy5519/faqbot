@@ -19,6 +19,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Org not found" }, { status: 404 });
     }
 
+    // TEMP DEBUG — remove after
+console.log("[billing] stripe key prefix =", (process.env.STRIPE_SECRET_KEY || process.env.STRIPE_API_KEY || "").slice(0, 8));
+
+
     let customerId = org.stripe_customer_id;
     if (!customerId) {
       const cust = await stripe.customers.create({ name: org.name || `Customer ${org.id}` });
