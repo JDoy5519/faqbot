@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useRef, useState } from "react";
+import { handleQuotaHeaderValues } from "@/lib/fetchWithQuotaToast";
 
 type UploadItem = {
   file: File;
@@ -100,6 +101,14 @@ export default function AdminUploadPage() {
       };
       xhr.onreadystatechange = async () => {
         if (xhr.readyState !== 4) return;
+        try {
+          handleQuotaHeaderValues({
+            used: xhr.getResponseHeader("x-plan-used"),
+            cap: xhr.getResponseHeader("x-plan-cap"),
+            warn: xhr.getResponseHeader("x-plan-warn"),
+            over: xhr.getResponseHeader("x-plan-over"),
+          });
+        } catch {}
         try {
           if (xhr.status >= 200 && xhr.status < 300) {
             const json = JSON.parse(xhr.responseText);

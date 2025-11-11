@@ -5,6 +5,7 @@ import { useChatClient } from "@/lib/useChatClient";
 import { ChatBubble } from "@/components/ui/ChatBubble";
 import { ChatComposer } from "@/components/ui/ChatComposer";
 
+
 type Bot = { id: string; name: string };
 
 export default function AdminChatPage() {

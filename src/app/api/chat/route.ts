@@ -14,6 +14,7 @@ import {
 import { createPublicSupaClient } from "@/lib/supaClientPublic";
 import { supabaseAdmin } from "@/lib/supaAdmin";
 import { getOrgQuota, buildQuotaHeaders } from "@/lib/quota";
+import * as Sentry from "@sentry/nextjs";
 
 // ---------------- rate limiter (simple, in-memory) ----------------
 const BUCKET = new Map<string, { tokens: number; updated: number }>();
@@ -495,13 +496,23 @@ export async function POST(req: NextRequest) {
       { status: 200, headers: warnHeadersPriv }
     );
   } catch (err: any) {
+    // Send all unhandled errors to Sentry
+    try {
+      const Sentry = await import("@sentry/nextjs");
+      Sentry.captureException(err);
+    } catch {}
+  
     if (err?.issues) {
-      // Show readable zod errors to the client (your UI will display them properly)
+      // Zod validation errors (nice readable for client)
       return NextResponse.json({ ok: false, error: err.issues }, { status: 400 });
     }
-    return NextResponse.json({ ok: false, error: err?.message || "Bad request" }, { status: 400 });
+  
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Bad request" },
+      { status: 400 }
+    );
   }
-}
+}  
 
 
 

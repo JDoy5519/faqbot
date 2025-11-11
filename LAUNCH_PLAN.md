@@ -28,8 +28,10 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 //also adjusted the api/chat so it dealt better with fake uploads. When I'm ready to deploy I need to disable these fake flags and call the OpenAI API key accordingly  
 - [ X] **Widget Embed snippet** — one-click copy for client sites
 //test widget logic included in the original logic if I need to find it.  
-- [ ] **Billing UI polish** — plan display, usage bar, portal link  
-- [ ] **Quota alerts + Sentry** — email at 80% usage, error tracking  
+- [ X] **Billing UI polish** — plan display, usage bar, portal link  
+//need to inspect the behaviour of billing/settings on the UI as it doesn't seeem to be currently gelling very well.
+- [ ] **Quota alerts + Sentry** — email at 80% usage, error tracking 
+//sort the vercel.envs at a later date with Phase 7 to ensure this is wired up correctly
 
 **Target branch:** `feature/phase5-ui`  
 **Outcome:** fully usable admin interface.
