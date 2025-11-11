@@ -23,7 +23,7 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 
 - [ X] **AppShell + Navigation** — consistent sidebar, header, toasts  
 - [ X] **Get Started checklist** — guided onboarding progress  
-- [ ] **Upload UX & Job Poller** — progress bar + post-embed link  
+- [ X] **Upload UX & Job Poller** — progress bar + post-embed link  
 - [ ] **Chat UI polish** — persistent history, citations, quota toasts  
 - [ ] **Widget Embed snippet** — one-click copy for client sites  
 - [ ] **Billing UI polish** — plan display, usage bar, portal link  
