@@ -103,8 +103,24 @@ export default function AdminUploadPage() {
         try {
           if (xhr.status >= 200 && xhr.status < 300) {
             const json = JSON.parse(xhr.responseText);
-            const url = json?.files?.[0]?.publicUrl ?? null;
-            const docId = json?.files?.[0]?.id as string | undefined;
+
+
+const url =
+  json?.files?.[0]?.publicUrl ??
+  null;
+
+// Prefer per-file document_id; fallback to top-level and legacy alias
+const docId =
+  (json?.files?.[0]?.document_id as string | undefined) ??
+  (json?.document_id as string | undefined) ??
+  (json?.id as string | undefined);
+
+// (Optional) capture job id if you want to show it
+const jobId =
+  (json?.files?.[0]?.job_id as string | undefined) ??
+  (json?.job_id as string | undefined) ??
+  (json?.jobId as string | undefined);
+
 
             setItems((prev) => {
               const clone = [...prev];
