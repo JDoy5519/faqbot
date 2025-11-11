@@ -24,7 +24,8 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 - [ X] **AppShell + Navigation** — consistent sidebar, header, toasts  
 - [ X] **Get Started checklist** — guided onboarding progress  
 - [ X] **Upload UX & Job Poller** — progress bar + post-embed link  
-- [ ] **Chat UI polish** — persistent history, citations, quota toasts  
+- [ X] **Chat UI polish** — persistent history, citations, quota toasts
+//also adjusted the api/chat so it dealt better with fake uploads. When I'm ready to deploy I need to disable these fake flags and call the OpenAI API key accordingly  
 - [ ] **Widget Embed snippet** — one-click copy for client sites  
 - [ ] **Billing UI polish** — plan display, usage bar, portal link  
 - [ ] **Quota alerts + Sentry** — email at 80% usage, error tracking  
