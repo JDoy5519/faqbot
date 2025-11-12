@@ -1,38 +1,32 @@
-// src/lib/supaServer.ts
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-// If you have generated DB types, you can do: createServerClient<Database>(...)
+import { requireEnv } from "./requireEnv";
+
+const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+const anon = requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
 export async function supaServer() {
-  // In Next 15+, cookies() can be async -> returns a Promise
-  const cookieStore = await cookies();
+  // Next 15 may return a Promise; await is safe across versions
+  const cookieStore: any = await (cookies() as any);
 
-  return createServerClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options?: CookieOptions) {
-          try {
-            // Next 15 supports the object form
-            cookieStore.set({ name, value, ...options });
-          } catch {
-            // Some contexts (e.g., certain RSC/Edge paths) can’t set cookies
-          }
-        },
-        remove(name: string, options?: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: "", ...options });
-          } catch {
-            // Same note as above
-          }
-        },
+  return createServerClient(url, anon, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
       },
-    }
-  );
+      set(name: string, value: string, options?: CookieOptions) {
+        try {
+          cookieStore.set({ name, value, ...options });
+        } catch {}
+      },
+      remove(name: string, options?: CookieOptions) {
+        try {
+          cookieStore.set({ name, value: "", ...options, maxAge: 0 });
+        } catch {}
+      },
+    },
+  });
 }
+
 
 
