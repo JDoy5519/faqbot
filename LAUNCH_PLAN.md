@@ -30,7 +30,7 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 //test widget logic included in the original logic if I need to find it.  
 - [ X] **Billing UI polish** — plan display, usage bar, portal link  
 //need to inspect the behaviour of billing/settings on the UI as it doesn't seeem to be currently gelling very well.
-- [ ] **Quota alerts + Sentry** — email at 80% usage, error tracking 
+- [ X] **Quota alerts + Sentry** — email at 80% usage, error tracking 
 //sort the vercel.envs at a later date with Phase 7 to ensure this is wired up correctly
 
 **Target branch:** `feature/phase5-ui`  
@@ -143,8 +143,8 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 | 2 | Embeddings + Search | ✅ Done |
 | 3 | Admin Console | ✅ Done |
 | 4 | Chat Endpoint | ✅ Done |
-| 5 | Productization (UI polish) | ⬜ Next |
-| 6 | Production Deploy | ⬜ Planned |
+| 5 | Productization (UI polish) |✅ Done  |
+| 6 | Production Deploy | ⬜ Next |
 | 7 | Trial + Billing Gating | ⬜ Planned |
 | 8 | Marketing Site | ⬜ Planned |
 | 9 | Private Beta | ⬜ Planned |

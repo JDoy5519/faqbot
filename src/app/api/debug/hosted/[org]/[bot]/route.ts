@@ -12,7 +12,7 @@ export async function GET(_req: Request, ctx: Ctx) {
 
   // 1) What env is the server using?
   const env = {
-    SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "(missing)",
+    SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL|| process.env.NEXT_PUBLIC_SUPABASE_URL || "(missing)",
     KEY_KIND:
       process.env.SUPABASE_SERVICE_ROLE_KEY ? "service-role" :
       process.env.SUPABASE_ANON_KEY ? "anon" :
