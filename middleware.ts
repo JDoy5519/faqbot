@@ -1,37 +1,54 @@
-// middleware.ts (project root)
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+// middleware.ts
+import { NextRequest, NextResponse } from "next/server";
 
-const ADMIN_COOKIE = "faqbot_admin";
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
+// Only protect /admin routes; everything else passes through.
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const url = new URL(req.url);
+  const { pathname, searchParams } = url;
 
-  // --- Allow embedding of /public/embed (CSP) ---
-  if (pathname.startsWith("/public/embed")) {
-    const res = NextResponse.next();
-    // Allow all ancestors (you can lock this to specific domains later)
-    res.headers.set("Content-Security-Policy", "frame-ancestors *");
-    // Remove X-Frame-Options so CSP is effective (ALLOWALL isn't a valid value)
-    res.headers.delete("X-Frame-Options");
-    return res;
+  // Only touch /admin routes
+  if (!pathname.startsWith("/admin")) {
+    return NextResponse.next();
   }
 
-  // --- Protect /admin (except /admin/login) ---
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
-    const cookie = req.cookies.get(ADMIN_COOKIE)?.value;
-    if (!cookie) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/admin/login";
-      url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
+  // Always allow the login page itself
+  if (pathname === "/admin/login") {
+    return NextResponse.next();
+  }
+
+  // If no ADMIN_TOKEN is set at all, fail open (so you don't lock yourself out)
+  if (!ADMIN_TOKEN) {
+    return NextResponse.next();
+  }
+
+  // Try to read token from cookie, header, or querystring
+  const cookieToken = req.cookies.get("admin_token")?.value;
+  const headerToken = req.headers.get("x-admin-token");
+  const queryToken = searchParams.get("token");
+
+  const incoming = cookieToken || headerToken || queryToken;
+
+  if (incoming === ADMIN_TOKEN) {
+    // If it came via header/query, persist it as a cookie
+    if (!cookieToken && incoming) {
+      const res = NextResponse.next();
+      res.cookies.set("admin_token", incoming, {
+        httpOnly: true,
+        path: "/",
+        sameSite: "lax",
+      });
+      return res;
     }
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  // Not authorised → redirect to /admin/login (NOT /)
+  return NextResponse.redirect(new URL("/admin/login", req.url));
 }
 
-// Only run on these routes
 export const config = {
-  matcher: ["/public/embed", "/admin/:path*"],
+  matcher: ["/admin/:path*"],
 };
+
