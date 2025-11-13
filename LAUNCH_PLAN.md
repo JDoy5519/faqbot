@@ -42,14 +42,24 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 
 > Goal: Migrate from local/test to a stable production environment.
 
-- [ ] Create **Supabase Production Project** (`faqbot-prod`)  
-- [ ] Configure **Vercel** project → add all `.env` vars  
-- [ ] Swap **Stripe keys** to live mode (`sk_live_...`, `pk_live_...`)  
+- [ X] Create **Supabase Production Project** (`faqbot-prod`)  
+- [ X] Configure **Vercel** project → add all `.env` vars  
+- [ X] Swap **Stripe keys** to live mode (`sk_live_...`, `pk_live_...`)
+//this is still in testing mode for the time-being - will aim to shif this over relatively soon  
 - [ ] Duplicate products/prices in Stripe → copy new `price_...` IDs  
 - [ ] Swap **OpenAI key** to paid API key  
 - [ ] Update **webhook endpoint** to live domain  
 - [ ] Verify **RLS policies** still isolate org data  
-- [ ] Add **custom domain** (`faqbot.app` or similar)
+- [ X] Add **custom domain** (`faqbot.app` or similar)
+//still part of the vercel.app but is OK for the time-being until this is fully functioning
+
+//There are still a number of bugs at this point and it is not quite working the way that I had expected. Can be described as follows:
+
+- login has to refresh before it is actually working properly
+- struggling to see the full way in which this is working: where is the org and where is the admin?, how do each login?, what will be the view for both?, how to create a new organisation and allocate it which bot?
+- does settings exist within billing or is this seperate?
+- dashboard needs to be a bit more visually appealing and user friendly
+- optional bot in chat need to be dropdown and compulsory or at least have a default
 
 **Target branch:** `deploy/production`  
 **Outcome:** live deployment, ready for real payments.

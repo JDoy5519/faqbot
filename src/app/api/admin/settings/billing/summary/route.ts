@@ -2,68 +2,49 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { NextResponse } from "next/server";
-import { supaServer } from "@/lib/supaServer";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supaAdmin";
-import { getOrgQuota } from "@/lib/quota";
+import { ensureAdminOrThrow } from "@/lib/adminAuth";
 
-async function getOrgForUser() {
-  const supa = await supaServer();
-  const { data: { user } } = await supa.auth.getUser();
-  if (!user) return null;
+export async function GET(_req: NextRequest) {
+  // 1) Admin gate: must match ADMIN_TOKEN / admin_token cookie
+  await ensureAdminOrThrow();
 
-  const { data: join } = await supa
-    .from("users_orgs")
-    .select("organizations(*)")
-    .eq("user_id", user.id)
+  // 2) Find your one-and-only org for now (FAQBot Prod)
+  const { data: org, error: orgError } = await supabaseAdmin
+    .from("organizations")
+    .select(
+      "id, name, slug, plan, billing_status, trial_ends_at, period_start, period_end, plan_id"
+    )
+    .order("created_at", { ascending: true })
+    .limit(1)
     .single();
 
-  return (join?.organizations as any) ?? null;
-}
-
-export async function GET() {
-  try {
-    const org = await getOrgForUser();
-    if (!org?.id) {
-      return NextResponse.json({ ok: false, error: "No organization found" }, { status: 401 });
-    }
-
-    // Raw quota: { used, cap, warn, over }
-    const q = await getOrgQuota(org.id);
-
-    // Normalize to UI contract
-    const quota = {
-      used: Number(q?.used ?? 0),
-      limit: q?.cap == null ? null : Number(q.cap), // map cap -> limit
-      over: Boolean(q?.over),
-      period_start: null as string | null, // not provided by your helper
-      period_end: null as string | null,   // not provided by your helper
-      // If you later add window bounds in getOrgQuota(), map them here
-    };
-
-    // Optional org plan fields (safe fallbacks)
-    const { data: orgRow } = await supabaseAdmin
-      .from("organizations")
-      .select("id, name, plan_name, plan_status, trial_ends_at")
-      .eq("id", org.id)
-      .maybeSingle();
-
-    const planName = orgRow?.plan_name ?? "Free";
-    const planStatus = (orgRow?.plan_status as string) ?? (quota.over ? "past_due" : "active");
-    const trialEndsAt = orgRow?.trial_ends_at ?? null;
-
-    return NextResponse.json({
-      ok: true,
-      org_id: org.id,
-      plan: {
-        name: planName,
-        status: planStatus,
-        trial_ends_at: trialEndsAt,
-      },
-      quota,
-    });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || "Failed" }, { status: 500 });
+  if (orgError || !org) {
+    return NextResponse.json(
+      { error: "No organization found" },
+      { status: 404 }
+    );
   }
+
+  // 3) Pull quota snapshot (using the org_quota_snapshot(p_org) function you migrated)
+  const { data: quota, error: quotaError } = await supabaseAdmin.rpc(
+    "org_quota_snapshot",
+    { p_org: org.id }
+  );
+
+  if (quotaError) {
+    return NextResponse.json(
+      { error: quotaError.message },
+      { status: 500 }
+    );
+  }
+
+  // 4) Return payload the UI can use
+  return NextResponse.json({
+    org,
+    quota,
+  });
 }
+
 
