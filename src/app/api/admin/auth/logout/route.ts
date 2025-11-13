@@ -1,19 +1,17 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
+// src/app/api/admin/auth/logout/route.ts
 import { NextResponse } from "next/server";
-
-const ADMIN_COOKIE = "faqbot_admin";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(ADMIN_COOKIE, "", {
+  // Clear the cookie
+  res.cookies.set("admin_token", "", {
     httpOnly: true,
+    path: "/",
+    maxAge: 0,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0, // expire now
   });
   return res;
 }
+
 
