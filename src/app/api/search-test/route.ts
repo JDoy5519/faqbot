@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { supaAdmin } from "@/lib/supaAdmin";
+import { supabaseAdmin } from "@/lib/supaAdmin";
 import { embedTexts } from "@/lib/ai";
 
 export async function GET() {
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   // Make one 1536-d embedding (real or fake, depending on your env)
   const [qvec] = await embedTexts([question]);
 
-  const { data, error } = await supaAdmin.rpc("match_doc_chunks", {
+  const { data, error } = await supabaseAdmin.rpc("match_doc_chunks", {
     p_bot_id: botId,
     p_query_embedding: qvec,
     p_match_count: 5

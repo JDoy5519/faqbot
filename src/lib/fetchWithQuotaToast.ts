@@ -1,49 +1,65 @@
 // src/lib/fetchWithQuotaToast.ts
 import { toast } from "sonner";
 
-// These are the headers your server sets via buildQuotaHeaders(quota)
-const H_USED = "x-plan-used";
-const H_CAP = "x-plan-cap";
-const H_WARN = "x-plan-warn";
-const H_OVER = "x-plan-over";
+export type QuotaHeaderBundle = {
+  used: string | null;
+  cap: string | null;
+  warn: string | null;
+  over: string | null;
+};
 
-// Core: call this with a Headers object
-export function handleQuotaHeaders(headers: Headers) {
-  const used = Number(headers.get(H_USED) || "0");
-  const cap = Number(headers.get(H_CAP) || "0");
-  const warn = (headers.get(H_WARN) || "").toLowerCase() === "true";
-  const over = (headers.get(H_OVER) || "").toLowerCase() === "true";
+export type QuotaRequestInit = RequestInit & {
+  /**
+   * Optional callback when server signals a quota warning.
+   * If omitted, we fall back to a default toast.
+   */
+  onWarn?: (message: string) => void;
+};
 
-  if (over) {
-    toast.error(`You’ve exceeded your monthly plan limit.`, { id: "quota-over" });
-  } else if (warn && cap > 0) {
-    const pct = Math.min(100, Math.round((used / cap) * 100));
-    toast.warning(`You’re at ${pct}% of your monthly limit (${used}/${cap}).`, { id: "quota-warn" });
+/**
+ * Shared helper to inspect quota-related header values.
+ * Can be called from XHR code (using getResponseHeader)
+ * or from fetch-based helpers that construct this bundle.
+ */
+export function handleQuotaHeaderValues(
+  bundle: QuotaHeaderBundle,
+  onWarn?: (message: string) => void
+) {
+  const { warn } = bundle;
+
+  if (!warn) return;
+
+  if (onWarn) {
+    onWarn(warn);
+  } else {
+    toast(warn);
   }
 }
 
-// Convenience: call this when you only have raw header values (e.g., XHR)
-export function handleQuotaHeaderValues(opts: {
-  used?: string | null;
-  cap?: string | null;
-  warn?: string | null;
-  over?: string | null;
-}) {
-  const h = new Headers();
-  if (opts.used != null) h.set(H_USED, String(opts.used));
-  if (opts.cap != null) h.set(H_CAP, String(opts.cap));
-  if (opts.warn != null) h.set(H_WARN, String(opts.warn));
-  if (opts.over != null) h.set(H_OVER, String(opts.over));
-  handleQuotaHeaders(h);
-}
+/**
+ * Wrapper around fetch that automatically surfaces quota warnings
+ * via toast (or a custom onWarn callback).
+ */
+export async function fetchWithQuotaToast(
+  input: RequestInfo | URL,
+  init: QuotaRequestInit = {}
+) {
+  const { onWarn, ...fetchInit } = init;
 
-// Drop-in replacement for fetch
-export async function fetchWithQuotaToast(input: RequestInfo | URL, init?: RequestInit) {
-  const res = await fetch(input, init);
-  // fire toast from headers (non-blocking)
-  try {
-    handleQuotaHeaders(res.headers);
-  } catch {}
+  const res = await fetch(input, fetchInit);
+
+  const bundle: QuotaHeaderBundle = {
+    used: res.headers.get("x-plan-used"),
+    cap: res.headers.get("x-plan-cap"),
+    warn: res.headers.get("x-plan-warn") ?? res.headers.get("x-quota-warn"),
+    over: res.headers.get("x-plan-over"),
+  };
+
+  handleQuotaHeaderValues(bundle, onWarn);
+
   return res;
 }
+
+
+
 

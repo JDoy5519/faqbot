@@ -1,7 +1,8 @@
-import { pingAI } from "@/lib/ai";
+// src/app/api/ai-ping/route.ts
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return new Response(JSON.stringify({ ok: await pingAI() }), {
-    headers: { "Content-Type": "application/json" }
-  });
+  return Response.json({ ok: true });
 }
+
