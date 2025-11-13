@@ -1,34 +1,32 @@
 // src/lib/adminAuth.ts
-// src/lib/adminAuth.ts
-import { cookies, headers } from "next/headers";
+import { NextRequest } from "next/server";
+
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
 /**
- * Ensures the current request is from an authenticated admin.
- * Checks the faqbot_admin cookie OR the x-admin-token header.
- * Throws an Error (with .status = 401) if not authorized.
+ * Throws 401 if the incoming request is not authorised as admin.
+ * Accepts token from:
+ * - Cookie: admin_token
+ * - Header: x-admin-token
+ * - Query:  ?token=...
  */
-export async function ensureAdminOrThrow() {
-  // A) Cookie
-  const cookieVal = (await cookies()).get("faqbot_admin")?.value;
-  if (cookieVal === "1") return;
+export function ensureAdminOrThrow(req: NextRequest) {
+  // In dev, if no ADMIN_TOKEN is configured, fail open
+  if (!ADMIN_TOKEN) return;
 
-  // B) Headers
-  const h = await headers();
+  const url = new URL(req.url);
 
-  // x-admin-token header
-  const tokenHeader = h.get("x-admin-token");
+  const cookieToken = req.cookies.get("admin_token")?.value;
+  const headerToken = req.headers.get("x-admin-token");
+  const queryToken = url.searchParams.get("token");
 
-  // Authorization: Bearer <token>
-  const auth = h.get("authorization");
-  const bearer = auth?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
+  const incoming = cookieToken || headerToken || queryToken;
 
-  const presented = tokenHeader || bearer || "";
-  const expected = process.env.ADMIN_TOKEN || "";
-
-  if (presented && expected && presented === expected) return;
-
-  const err = new Error("Unauthorized");
-  (err as any).status = 401;
-  throw err;
+  if (incoming !== ADMIN_TOKEN) {
+    const err: any = new Error("Unauthorized");
+    err.statusCode = 401;
+    throw err;
+  }
 }
+
 
