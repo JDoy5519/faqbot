@@ -1,32 +1,57 @@
 // src/lib/adminAuth.ts
-import { NextRequest } from "next/server";
+import { cookies, headers } from "next/headers";
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
 /**
- * Throws 401 if the incoming request is not authorised as admin.
+ * Ensures the current request is from an authenticated admin.
+ *
  * Accepts token from:
- * - Cookie: admin_token
+ * - Cookie: admin_token (new flow)
+ * - Cookie: faqbot_admin === "1" (backwards compat)
  * - Header: x-admin-token
- * - Query:  ?token=...
+ * - Header: Authorization: Bearer <token>
+ *
+ * Throws an Error with .status = 401 if not authorised.
  */
-export function ensureAdminOrThrow(req: NextRequest) {
+export async function ensureAdminOrThrow() {
   // In dev, if no ADMIN_TOKEN is configured, fail open
   if (!ADMIN_TOKEN) return;
 
-  const url = new URL(req.url);
+  const cookieStore = await cookies();
 
-  const cookieToken = req.cookies.get("admin_token")?.value;
-  const headerToken = req.headers.get("x-admin-token");
-  const queryToken = url.searchParams.get("token");
+  // New flow: admin_token must match ADMIN_TOKEN
+  const adminTokenCookie = cookieStore.get("admin_token")?.value;
 
-  const incoming = cookieToken || headerToken || queryToken;
-
-  if (incoming !== ADMIN_TOKEN) {
-    const err: any = new Error("Unauthorized");
-    err.statusCode = 401;
-    throw err;
+  if (adminTokenCookie && adminTokenCookie === ADMIN_TOKEN) {
+    return;
   }
+
+  // Old flow (backwards compat): faqbot_admin === "1"
+  const legacyCookie = cookieStore.get("faqbot_admin")?.value;
+  if (legacyCookie === "1") {
+    return;
+  }
+
+  // Headers
+  const h = await headers();
+
+  // x-admin-token header
+  const headerToken = h.get("x-admin-token");
+
+  // Authorization: Bearer <token>
+  const auth = h.get("authorization");
+  const bearer = auth?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
+
+  const presented = headerToken || bearer || "";
+
+  if (presented && presented === ADMIN_TOKEN) {
+    return;
+  }
+
+  const err: any = new Error("Unauthorized");
+  err.status = 401;
+  throw err;
 }
 
 
