@@ -60,6 +60,7 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 - dashboard needs to be a bit more visually appealing and user friendly
 - optional bot in chat need to be dropdown and compulsory or at least have a default
 - what is going to be the true behaviour of the site as in there is not 'homepage' where are re-directing traffic/using for admin login etc.
+- still occasionally having to refresh on the admin token login - may be due to the system being slow?
 
 **Target branch:** `deploy/production`  
 **Outcome:** live deployment, ready for real payments.

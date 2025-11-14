@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";                 // ⬅ uses your Clover apiVersion
+import { stripe } from "@/lib/stripe"; // Clover client
 import { supabaseAdmin } from "@/lib/supaAdmin";
 import { ensureAdminOrThrow } from "@/lib/adminAuth";
 
@@ -38,14 +38,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4) Build return URLs
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin || "";
-    const baseReturn =
-      process.env.BILLING_RETURN_URL ||
-      `${baseUrl}/admin/settings/billing`;
-
-    const successUrl = `${baseReturn}?result=success`;
-    const cancelUrl = `${baseReturn}?result=cancelled`;
+    // 4) Build return URLs from the request origin (bulletproof)
+    const origin = req.nextUrl.origin; // e.g. https://faqbot1.vercel.app
+    const successUrl = `${origin}/admin/settings/billing?result=success`;
+    const cancelUrl = `${origin}/admin/settings/billing?result=cancelled`;
 
     // 5) Ensure we have/create a Stripe customer for this org
     let customerId = org.stripe_customer_id || undefined;
@@ -87,3 +83,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
