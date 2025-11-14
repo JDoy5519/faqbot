@@ -1,122 +1,106 @@
+// src/app/api/stripe/webhook/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import Stripe from "stripe";
+import { stripe } from "@/lib/stripe"; // Clover client
 import { supabaseAdmin } from "@/lib/supaAdmin";
-// pick a consolidated period from subscription items
-import type Stripe from "stripe";
+import { requireEnv } from "@/lib/requireEnv";
 
-function derivePeriodFromItems(sub: Stripe.Subscription) {
-  const items = sub.items?.data ?? [];
-  const starts = items.map(i => i.current_period_start ?? 0).filter(Boolean);
-  const ends   = items.map(i => i.current_period_end   ?? 0).filter(Boolean);
-
-  // If nothing is present (edge cases), fall back to "now"
-  const startTs = starts.length ? Math.max(...starts) : Math.floor(Date.now() / 1000);
-  const endTs   = ends.length   ? Math.min(...ends)   : startTs;
-
-  return {
-    periodStartISO: new Date(startTs * 1000).toISOString(),
-    periodEndISO:   new Date(endTs   * 1000).toISOString(),
-  };
-}
-
-
-function unwrap<T>(r: Stripe.Response<T> | T): T {
-  return r as T;
-}
-
-function planFromPrice(priceId: string): string | null {
-  if (!priceId) return null;
-  if (priceId === process.env.STRIPE_PRICE_FAQ_STARTER) return "starter";
-  if (priceId === process.env.STRIPE_PRICE_FAQ_PRO) return "pro";
-  return null;
-}
+const webhookSecret = requireEnv("STRIPE_WEBHOOK_SECRET");
 
 export async function POST(req: NextRequest) {
-  const sig = req.headers.get("stripe-signature") || "";
-  const raw = await req.arrayBuffer();
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) {
+    return NextResponse.json({ error: "Missing Stripe signature" }, { status: 400 });
+  }
 
-  let evt: Stripe.Event;
+  let event: Stripe.Event;
+
   try {
-    evt = stripe.webhooks.constructEvent(Buffer.from(raw), sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    const body = await req.text(); // raw body, NOT json()
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: `Webhook signature failed: ${err.message}` }, { status: 400 });
+    console.error("[stripe] webhook signature error", err?.message || err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
   try {
-    switch (evt.type) {
+    console.log("[stripe] event type:", event.type);
+
+    switch (event.type) {
       case "checkout.session.completed": {
-        const s = evt.data.object as Stripe.Checkout.Session;
-        const org_id = s.metadata?.org_id;
-        if (!org_id) break;
+        const session = event.data.object as Stripe.Checkout.Session;
+        const orgId = session.metadata?.org_id as string | undefined;
+        const customerId = session.customer as string | null;
+        const subscriptionId = session.subscription as string | null;
 
-        if (s.subscription) {
-          const subId = typeof s.subscription === "string" ? s.subscription : s.subscription.id;
-          const sub = unwrap(await stripe.subscriptions.retrieve(subId));
-
-          const { periodStartISO, periodEndISO } = derivePeriodFromItems(sub);
-
-
-          await supabaseAdmin.from("organizations").update({
-            stripe_subscription_id: sub.id,
-            stripe_customer_id: s.customer as string,
-            period_start: periodStartISO,
-            period_end: periodEndISO,
-            plan_id: planFromPrice(sub.items.data[0]?.price?.id || ""),
-          }).eq("id", org_id);
+        if (!orgId) {
+          console.warn("[stripe] checkout.session.completed without org_id metadata");
+          break;
         }
+
+        const updates: Record<string, any> = {
+          billing_status: "active",
+        };
+
+        if (customerId) updates.stripe_customer_id = customerId;
+        if (subscriptionId) updates.stripe_subscription_id = subscriptionId;
+        if (!updates.plan_id) updates.plan_id = "starter";
+
+        const { error } = await supabaseAdmin
+          .from("organizations")
+          .update(updates)
+          .eq("id", orgId);
+
+        if (error) {
+          console.error("[stripe] failed to update organization from checkout:", error);
+        } else {
+          console.log("[stripe] organization updated from checkout:", orgId);
+        }
+
         break;
       }
 
-      case "customer.subscription.created":
+      case "customer.subscription.deleted":
       case "customer.subscription.updated": {
-        const sub = evt.data.object as Stripe.Subscription;
+        const sub = event.data.object as Stripe.Subscription;
+        const customerId = sub.customer as string | null;
 
-        const { data: org } = await supabaseAdmin
+        if (!customerId) break;
+
+        const billing_status =
+          sub.status === "active" || sub.status === "trialing" ? "active" : "cancelled";
+
+        const { error } = await supabaseAdmin
           .from("organizations")
-          .select("id")
-          .eq("stripe_customer_id", sub.customer as string)
-          .single();
-        if (!org) break;
+          .update({
+            billing_status,
+            stripe_subscription_id: sub.id,
+          })
+          .eq("stripe_customer_id", customerId);
 
-        const { periodStartISO, periodEndISO } = derivePeriodFromItems(sub);
+        if (error) {
+          console.error("[stripe] failed to sync subscription:", error);
+        } else {
+          console.log("[stripe] subscription synced to org (customer)", customerId);
+        }
 
-
-        await supabaseAdmin.from("organizations").update({
-          stripe_subscription_id: sub.id,
-          period_start: periodStartISO,
-          period_end: periodEndISO  ,
-          plan_id: planFromPrice(sub.items.data[0]?.price?.id || ""),
-        }).eq("id", org.id);
         break;
       }
 
-      case "customer.subscription.deleted": {
-        const sub = evt.data.object as Stripe.Subscription;
-
-        const { data: org } = await supabaseAdmin
-          .from("organizations")
-          .select("id")
-          .eq("stripe_customer_id", sub.customer as string)
-          .single();
-        if (!org) break;
-
-        await supabaseAdmin.from("organizations").update({
-          plan_id: null,
-          stripe_subscription_id: null,
-          period_start: null,
-          period_end: null,
-        }).eq("id", org.id);
+      default:
+        // Ignore other events for now
         break;
-      }
     }
 
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
+    return NextResponse.json({ received: true });
+  } catch (err: any) {
+    console.error("[stripe] webhook handler error", err);
+    return NextResponse.json(
+      { error: err?.message || "Webhook handler error" },
+      { status: 500 }
+    );
   }
 }
-
-
