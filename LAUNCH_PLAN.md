@@ -46,10 +46,11 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 - [ X] Configure **Vercel** project → add all `.env` vars  
 - [ X] Swap **Stripe keys** to live mode (`sk_live_...`, `pk_live_...`)
 //this is still in testing mode for the time-being - will aim to shif this over relatively soon  
-- [ ] Duplicate products/prices in Stripe → copy new `price_...` IDs  
-- [ ] Swap **OpenAI key** to paid API key  
-- [ ] Update **webhook endpoint** to live domain  
-- [ ] Verify **RLS policies** still isolate org data  
+- [ X] Duplicate products/prices in Stripe → copy new `price_...` IDs  
+- [ X] Swap **OpenAI key** to paid API key
+//still using the test on this for the time being and this will be updated when we come to it in phase7  
+- [ X] Update **webhook endpoint** to live domain  
+- [ X] Verify **RLS policies** still isolate org data  
 - [ X] Add **custom domain** (`faqbot.app` or similar)
 //still part of the vercel.app but is OK for the time-being until this is fully functioning
 
@@ -61,6 +62,7 @@ Next: convert from a technical demo → production-ready SaaS with live payments
 - optional bot in chat need to be dropdown and compulsory or at least have a default
 - what is going to be the true behaviour of the site as in there is not 'homepage' where are re-directing traffic/using for admin login etc.
 - still occasionally having to refresh on the admin token login - may be due to the system being slow?
+- no option on the dashboard to go straight to uploads - it is only linked up to uploads through the get started tab which is not helpful UI
 
 **Target branch:** `deploy/production`  
 **Outcome:** live deployment, ready for real payments.
